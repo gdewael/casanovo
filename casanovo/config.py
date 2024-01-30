@@ -66,6 +66,8 @@ class Config:
         max_epochs=int,
         num_sanity_val_steps=int,
         train_from_scratch=bool,
+        pretrain=bool,
+        precision=str,
         save_top_k=int,
         model_save_folder_path=str,
         val_check_interval=int,

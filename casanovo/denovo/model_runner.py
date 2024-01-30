@@ -20,7 +20,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from ..config import Config
 from ..data import ms_io
 from ..denovo.dataloaders import DeNovoDataModule
-from ..denovo.model import Spec2Pep
+from ..denovo.model import Spec2Pep, Pretrainer
 
 
 logger = logging.getLogger("casanovo")
@@ -193,6 +193,7 @@ class ModelRunner:
                 strategy=self._get_strategy(),
                 val_check_interval=self.config.val_check_interval,
                 check_val_every_n_epoch=None,
+                precision=self.config.precision,
             )
             trainer_cfg.update(additional_cfg)
 
@@ -251,6 +252,10 @@ class ModelRunner:
             out_writer=self.writer,
             calculate_precision=self.config.calculate_precision,
         )
+
+        if self.config.pretrain:
+            self.model = Pretrainer(**model_params)
+            return
 
         from_scratch = (
             self.config.train_from_scratch,

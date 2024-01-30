@@ -969,6 +969,166 @@ class Spec2Pep(pl.LightningModule, ModelMixin):
         return [optimizer], {"scheduler": lr_scheduler, "interval": "step"}
 
 
+class Pretrainer(Spec2Pep):
+    """
+    A Transformer model for pre-training on MS/MS data
+
+    Use this model in conjunction with a pytorch-lightning Trainer.
+
+    Parameters
+    ----------
+    p : float
+        Percentage of tokens to train on (half of which will be shuffled)
+    **kwargs : Dict
+        All keywords that would be passed to Spec2Pep.
+    """
+
+    def __init__(
+            self,
+            p: float = 0.15,
+            **kwargs: Dict,
+    ):
+        super().__init__(**kwargs)
+
+        self.save_hyperparameters()
+
+        #self.decoder = None
+        self.output_head = torch.nn.Linear(self.hparams.dim_model, 1)
+        self.p = p
+
+    def forward(self):
+        raise NotImplementedError
+    
+    def _forward_step(
+        self,
+        spectra: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Placeholder docs
+        """
+        h = self.encoder(spectra)[0]
+        return self.output_head(h[:, 1:]).squeeze(-1)
+    
+    def training_step(
+        self,
+        batch: Tuple[torch.Tensor, torch.Tensor, List[str]],
+        *args,
+        mode: str = "train",
+    ) -> torch.Tensor:
+        """
+        Placeholder docs
+        """
+        spectra = batch[0].to(self.dtype)
+        spectra_shuffled, labels, train_indices = self.shuffler(spectra)
+
+        logits = self._forward_step(spectra_shuffled)
+        
+        mlm_loss = torch.nn.functional.binary_cross_entropy_with_logits(
+            logits[train_indices], labels[train_indices].to(self.dtype)
+        )
+
+        self.log(
+            "train_CELoss",
+            mlm_loss,
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
+            batch_size=len(spectra),
+            )
+
+        return mlm_loss
+    
+    def validation_step(
+        self,
+        batch: Tuple[torch.Tensor, torch.Tensor, List[str]],
+        *args,
+    ):
+        """
+        Placeholder docs
+        """
+        spectra = batch[0].to(self.dtype)
+        spectra_shuffled, labels, train_indices = self.shuffler(spectra)
+
+        logits = self._forward_step(spectra_shuffled)
+        
+        mlm_loss = torch.nn.functional.binary_cross_entropy_with_logits(
+            logits[train_indices], labels[train_indices].to(self.dtype)
+        )
+        self.log(
+            "valid_CELoss",
+            mlm_loss,
+            batch_size = train_indices.sum().item(),
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
+            )
+
+        return mlm_loss
+
+    
+    def shuffler(self, spectra):
+        """
+        Shuffles peaks in a batch across spectra.
+        Self-supervised labels are recorded in `labels`.
+        Some (sampled) non-shuffled peaks are recorded as positive labels. ("belonging")
+        The shuffled peaks are recorded as negative labels. ("noisy")
+
+        Parameters
+        ----------
+        spectra : torch.Tensor
+            A batch of MS/MS spectra
+
+        Returns
+        -------
+        spectra_shuffled : torch.Tensor of shape (n_spectra, length, 2)
+            The individual amino acid scores for each prediction.
+        labels : torch.Tensor of shape (n_spectra, length)
+            Self-supervised labels (0 if shuffled, 1 otherwise)
+        train_indices : torch.Tensor of shape (n_spectra, length)
+            Indices to train on.
+        """
+        # all indices of the spectra tensor
+        all_indices = torch.stack(torch.where(~torch.isnan(spectra[..., 0]))).T
+
+        # make sure not to include padding tokens in shuffling
+        of_which_peaks = torch.where(spectra[..., 0][all_indices[:,0], all_indices[:, 1]] != 0)[0]
+
+        # select random peaks to train on
+        shuff, pos = torch.chunk(
+            torch.randperm(len(of_which_peaks), device=of_which_peaks.device)[
+                : int(len(of_which_peaks) * self.p)
+            ],
+            2,
+        )
+
+        # convert indices in the only-peaks indices array to indices for the whole indices array
+        shuff, pos = of_which_peaks[shuff], of_which_peaks[pos]
+
+        # shuffle the to-shuffle indices
+        shuffled_shuff = shuff[torch.randperm(len(shuff), device=shuff.device)]
+
+        # remove shuffled indices that are shuffled by accident to the same spectra
+        remove_ix = (all_indices[shuff] != all_indices[shuffled_shuff])[:, 0]
+        shuff = shuff[remove_ix]
+        shuffled_shuff = shuffled_shuff[remove_ix]
+        pos = pos[:len(shuff)] # also delete some random non-shuffled peaks to maintain balanced labels
+
+        # gather a tensor with indices to train on (all shuff and pos sampled indices)
+        train_indices = torch.zeros_like(spectra[..., 0].bool())
+        train_indices[all_indices[pos][:, 0], all_indices[pos][:, 1]] = True
+        train_indices[all_indices[shuff][:, 0], all_indices[shuff][:, 1]] = True
+
+        # gather a tensor with labels (all ones except for the shuffled indices)
+        labels = torch.ones_like(spectra[..., 0]).long()
+        labels[all_indices[shuff][:, 0], all_indices[shuff][:, 1]] = 0
+
+        # actually shuffle indices and re-index the spectra to be shuffled.
+        all_indices[shuff] = all_indices[shuffled_shuff]
+        spectra_shuffled = spectra[all_indices[:, 0], all_indices[:, 1]].view_as(spectra)
+        return spectra_shuffled, labels, train_indices
+
+
+
 class CosineWarmupScheduler(torch.optim.lr_scheduler._LRScheduler):
     """
     Learning rate scheduler with linear warm up followed by cosine shaped decay.

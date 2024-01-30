@@ -10,7 +10,6 @@ from typing import List
 
 import natsort
 
-from .. import __version__
 from ..config import Config
 
 
@@ -35,7 +34,7 @@ class MztabWriter:
                 f"Casanovo identification file "
                 f"{os.path.splitext(os.path.basename(self.filename))[0]}",
             ),
-            ("software[1]", f"[MS, MS:1003281, Casanovo, {__version__}]"),
+            ("software[1]", f"[MS, MS:1003281, Casanovo, 0.5]"),
             (
                 "psm_search_engine_score[1]",
                 "[MS, MS:1001143, search engine specific score for PSMs, ]",
@@ -190,7 +189,7 @@ class MztabWriter:
                         "null",  # unique
                         "null",  # database
                         "null",  # database_version
-                        f"[MS, MS:1003281, Casanovo, {__version__}]",
+                        f"[MS, MS:1003281, Casanovo, 0.4]",
                         psm[2],  # search_engine_score[1]
                         # FIXME: Modifications should be specified as
                         #  controlled vocabulary terms.
