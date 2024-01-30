@@ -99,11 +99,13 @@ train_batch_size: 32
 max_epochs: 30
 # Number of validation steps to run before training begins
 num_sanity_val_steps: 0
-# precision: determines floating data type precision, must be "float32", can be set to "bf16-mixed" for pretraining
-precision: "float32"
-# Set to "False" to further train a pre-trained Casanovo model
-train_from_scratch: True
-# Set to True to go into pretraining mode
+# precision: determines floating data type precision, must be "32", can be set to "bf16-mixed" for pretraining
+precision: "32"
+# Set to "True" to further train a partially trained Casanovo model
+train_from_partially_trained: False
+# Set to "True" to start training from a pre-trained Spectrum encoder
+train_from_pre_trained: False
+# Set to True to pre-train a Spectrum enocder using a shuffling LM approach
 pretrain: False
 # Calculate peptide and amino acid precision during training. this
 # is expensive, so we recommend against it.

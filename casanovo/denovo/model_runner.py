@@ -258,9 +258,10 @@ class ModelRunner:
             return
 
         from_scratch = (
-            self.config.train_from_scratch,
+            not self.config.train_from_partially_trained,
             self.model_filename is None,
         )
+        
         if train and any(from_scratch):
             self.model = Spec2Pep(**model_params)
             return
@@ -279,7 +280,12 @@ class ModelRunner:
         # the provided configuration.
         device = torch.empty(1).device  # Use the default device.
         try:
-            self.model = Spec2Pep.load_from_checkpoint(
+            if self.config.train_from_pre_trained:
+                modeltype = Pretrainer
+            else:
+                modeltype = Spec2Pep
+
+            self.model = modeltype.load_from_checkpoint(
                 self.model_filename, map_location=device, **loaded_model_params
             )
 
@@ -294,6 +300,21 @@ class ModelRunner:
                         f"vs config file ({model_params[param]}); "
                         "using the checkpoint."
                     )
+
+
+            if self.config.train_from_pre_trained:
+                model = Spec2Pep(**model_params)
+
+                pretrained_dict = self.model.state_dict()
+                model_dict = model.state_dict()
+                pretrained_dict = {
+                    k: v for k, v in pretrained_dict.items() if not k.startswith("output_head")
+                }
+                model_dict.update(pretrained_dict)
+                model.load_state_dict(model_dict)
+                print("Pre-trained model loaded")
+                self.model = model
+        
         except RuntimeError:
             # This only doesn't work if the weights are from an older version
             try:
