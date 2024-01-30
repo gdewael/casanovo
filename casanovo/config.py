@@ -63,7 +63,6 @@ class Config:
         predict_batch_size=int,
         n_beams=int,
         top_match=int,
-        max_epochs=int,
         num_sanity_val_steps=int,
         train_from_partially_trained=bool,
         train_from_pre_trained=bool,
@@ -75,6 +74,7 @@ class Config:
         calculate_precision=bool,
         accelerator=str,
         devices=int,
+        n_workers=int,
     )
 
     def __init__(self, config_file: Optional[str] = None):
@@ -106,8 +106,6 @@ class Config:
         for key, val in self._config_types.items():
             self.validate_param(key, val)
 
-        self._params["n_workers"] = utils.n_workers()
-
     def __getitem__(self, param: str) -> Union[int, bool, str, Tuple, Dict]:
         """Retrieve a parameter"""
         return self._params[param]
@@ -133,6 +131,10 @@ class Config:
                     str(aa): float(mass) for aa, mass in param_val.items()
                 }
                 self._params["residues"] = residues
+            elif param == "n_workers":
+                self._params["n_workers"] = (
+                    utils.n_workers() if param_val is None else param_val
+                )
             elif param_val is not None:
                 self._params[param] = param_type(param_val)
         except (TypeError, ValueError) as err:

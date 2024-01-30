@@ -188,7 +188,7 @@ class ModelRunner:
                 devices=devices,
                 callbacks=self.callbacks,
                 enable_checkpointing=self.config.save_top_k is not None,
-                max_epochs=self.config.max_epochs,
+                max_steps=self.config.max_iters,
                 num_sanity_val_steps=self.config.num_sanity_val_steps,
                 strategy=self._get_strategy(),
                 val_check_interval=self.config.val_check_interval,
@@ -258,7 +258,7 @@ class ModelRunner:
             return
 
         from_scratch = (
-            not self.config.train_from_partially_trained,
+            not (self.config.train_from_partially_trained or self.config.train_from_pre_trained),
             self.model_filename is None,
         )
         
@@ -312,7 +312,7 @@ class ModelRunner:
                 }
                 model_dict.update(pretrained_dict)
                 model.load_state_dict(model_dict)
-                print("Pre-trained model loaded")
+                logger.info("Pre-trained model loaded")
                 self.model = model
         
         except RuntimeError:

@@ -28,7 +28,8 @@ accelerator: "auto"
 # or the value -1 to indicate all available devices should be used,
 # If left empty, the appropriate number will be automatically
 # selected for automatic selected on the chosen accelerator.
-devices:
+devices: 1
+
 
 ###
 # The following parameters should only be modified if you are training a new
@@ -83,8 +84,6 @@ dim_intensity:
 max_length: 100
 # Number of warmup iterations for learning rate scheduler
 warmup_iters: 100_000
-# Max number of iterations for learning rate scheduler
-max_iters: 600_000
 # Learning rate for weight updates during training
 learning_rate: 5e-4
 # Regularization term for weight updates
@@ -95,8 +94,10 @@ train_label_smoothing: 0.01
 # TRAINING/INFERENCE OPTIONS
 # Number of spectra in one training batch
 train_batch_size: 32
-# Max number of training epochs
-max_epochs: 30
+# Number of CPU workers to use for data loading. Reduce to unburden CPU. Left open means use all available.
+n_workers: 
+# Max number of iterations to train on
+max_iters: 600_000
 # Number of validation steps to run before training begins
 num_sanity_val_steps: 0
 # precision: determines floating data type precision, must be "32", can be set to "bf16-mixed" for pretraining
@@ -104,7 +105,7 @@ precision: "32"
 # Set to "True" to further train a partially trained Casanovo model
 train_from_partially_trained: False
 # Set to "True" to start training from a pre-trained Spectrum encoder
-train_from_pre_trained: False
+train_from_pre_trained: True
 # Set to True to pre-train a Spectrum enocder using a shuffling LM approach
 pretrain: False
 # Calculate peptide and amino acid precision during training. this
